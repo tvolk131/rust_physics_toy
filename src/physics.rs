@@ -12,6 +12,7 @@ const SIZE_COEFFICIENT_PER_TICK: f32 = 0.998;
 const MIN_RADIUS_SIZE: f32 = 0.5;
 const GRAVITY: f32 = 0.2;
 const CELL_SIZE: f32 = 50.0;
+const BALL_COLOR: Color = Color::from_rgb(1.0, 0.6, 0.0);
 
 use crate::Message;
 
@@ -218,7 +219,7 @@ impl Program<Message> for Grid {
 
         for cell in &self.circles {
             let cell = Path::circle(Point::new(cell.x_pos, cell.y_pos), cell.radius);
-            frame.fill(&cell, Color::WHITE);
+            frame.fill(&cell, BALL_COLOR);
         }
 
         vec![frame.into_geometry()]
