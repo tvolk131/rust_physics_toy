@@ -1,0 +1,12 @@
+[package]
+name = "physics"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+iced = { git = "https://github.com/iced-rs/iced", rev = "8fb939b", features = [
+    "advanced",
+    "qr_code",
+    "svg",
+    "tokio",
+] }
