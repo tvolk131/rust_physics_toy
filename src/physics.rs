@@ -4,9 +4,12 @@ use iced::{
     Color, Point, Rectangle, Renderer, Size, Theme,
 };
 
+use std::collections::HashMap;
+
 const ELASTICITY_COEFFICIENT: f32 = 0.7;
 const AIR_RESISTANCE_COEFFICIENT: f32 = 0.998;
 const GRAVITY: f32 = 0.2;
+const CELL_SIZE: f32 = 50.0;
 
 use crate::Message;
 
@@ -42,8 +45,8 @@ impl Grid {
 
             // Move circles based on current velocity.
             for cell in &mut self.circles {
-                cell.x_pos = cell.x_pos + (cell.velocity.0 / sub_ticks as f32);
-                cell.y_pos = cell.y_pos + (cell.velocity.1 / sub_ticks as f32);
+                cell.x_pos += cell.velocity.0 / sub_ticks as f32;
+                cell.y_pos += cell.velocity.1 / sub_ticks as f32;
             }
 
             // Bounce circles off the walls, applying friction.
@@ -69,14 +72,33 @@ impl Grid {
                 }
             }
 
-            // Bounce circles off each other.
-            for i in 0..self.circles.len() {
-                for j in i + 1..self.circles.len() {
-                    let (left, right) = self.circles.split_at_mut(j);
-                    let circle_a = &mut left[i];
-                    let circle_b = right.first_mut().unwrap();
+            // Build the spatial grid for collision detection.
+            let mut grid: HashMap<(i32, i32), Vec<usize>> = HashMap::new();
 
-                    Self::avoid_collision(circle_a, circle_b);
+            for (i, circle) in self.circles.iter().enumerate() {
+                let min_cell_x = ((circle.x_pos - circle.radius) / CELL_SIZE).floor() as i32;
+                let max_cell_x = ((circle.x_pos + circle.radius) / CELL_SIZE).floor() as i32;
+                let min_cell_y = ((circle.y_pos - circle.radius) / CELL_SIZE).floor() as i32;
+                let max_cell_y = ((circle.y_pos + circle.radius) / CELL_SIZE).floor() as i32;
+
+                for cell_x in min_cell_x..=max_cell_x {
+                    for cell_y in min_cell_y..=max_cell_y {
+                        grid.entry((cell_x, cell_y)).or_default().push(i);
+                    }
+                }
+            }
+
+            // Bounce circles off each other within the grid cells.
+            for circle_indices in grid.values() {
+                let len = circle_indices.len();
+                for idx1 in 0..len {
+                    let i = circle_indices[idx1];
+                    for idx2 in (idx1 + 1)..len {
+                        let j = circle_indices[idx2];
+
+                        let (circle_a, circle_b) = self.get_two_mut(i, j);
+                        Self::avoid_collision(circle_a, circle_b);
+                    }
                 }
             }
         }
@@ -86,6 +108,18 @@ impl Grid {
             cell.velocity.0 *= AIR_RESISTANCE_COEFFICIENT;
             cell.velocity.1 *= AIR_RESISTANCE_COEFFICIENT;
         }
+    }
+
+    fn get_two_mut(&mut self, i: usize, j: usize) -> (&mut Circle, &mut Circle) {
+        assert!(i != j);
+        let (first, second) = if i < j {
+            let (left, right) = self.circles.split_at_mut(j);
+            (&mut left[i], &mut right[0])
+        } else {
+            let (left, right) = self.circles.split_at_mut(i);
+            (&mut right[0], &mut left[j])
+        };
+        (first, second)
     }
 
     pub fn avoid_collision(circle_a: &mut Circle, circle_b: &mut Circle) {
@@ -125,8 +159,6 @@ impl Grid {
         let v_bt = tx * circle_b.velocity.0 + ty * circle_b.velocity.1;
 
         // Masses (you might want to define mass based on area or keep it uniform)
-        // let m1 = circle_a.mass;
-        // let m2 = circle_b.mass;
         let m1 = 1.0;
         let m2 = 1.0;
 
