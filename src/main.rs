@@ -103,10 +103,10 @@ impl App {
             subscriptions.push(iced::time::every(TICK_SPEED).map(|_| Message::Tick));
             subscriptions.push(iced::time::every(Duration::from_millis(200)).map(|_| {
                 Message::AddCircle(Circle {
-                    x_pos: 25.0,
-                    y_pos: 250.0,
-                    radius: 25.0,
-                    velocity: (10.0, -10.0),
+                    x_pos: 2.5,
+                    y_pos: 2.5,
+                    radius: 2.5,
+                    velocity: (10.0, 0.0),
                 })
             }));
         }
