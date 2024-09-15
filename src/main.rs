@@ -69,7 +69,20 @@ impl App {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Tick => {
+                let now = std::time::Instant::now();
+
                 self.grid.tick(10);
+
+                let circle_count = self.grid.get_circle_count();
+                if circle_count > 0 {
+                    println!(
+                        "Tick took: {:?} ({:?} per circle)",
+                        now.elapsed(),
+                        now.elapsed() / circle_count as u32
+                    );
+                } else {
+                    println!("Tick took: {:?}", now.elapsed());
+                }
             }
             Message::AddCircle(circle) => {
                 self.grid.add_circle(circle);

@@ -29,6 +29,10 @@ impl Grid {
         self.circles.push(circle);
     }
 
+    pub fn get_circle_count(&self) -> usize {
+        self.circles.len()
+    }
+
     pub fn tick(&mut self, sub_ticks: u32) {
         for _ in 0..sub_ticks {
             // Apply gravity to all circles.
