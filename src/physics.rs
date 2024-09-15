@@ -7,7 +7,7 @@ use iced::{
 use std::collections::HashMap;
 
 const ELASTICITY_COEFFICIENT: f32 = 0.7;
-const AIR_RESISTANCE_COEFFICIENT: f32 = 0.998;
+const AIR_DENSITY: f32 = 0.005;
 const SIZE_COEFFICIENT_PER_TICK: f32 = 0.998;
 const MIN_RADIUS_SIZE: f32 = 0.5;
 const GRAVITY: f32 = 0.2;
@@ -43,8 +43,11 @@ impl Grid {
         // Apply subtick-independent forces first.
         for circle in &mut self.circles {
             // Apply air resistance to all circles.
-            circle.velocity.0 *= AIR_RESISTANCE_COEFFICIENT;
-            circle.velocity.1 *= AIR_RESISTANCE_COEFFICIENT;
+            let velocity = (circle.velocity.0.powi(2) + circle.velocity.1.powi(2)).sqrt();
+            let resistance = velocity * AIR_DENSITY;
+            let angle = circle.velocity.1.atan2(circle.velocity.0);
+            circle.velocity.0 -= resistance * angle.cos();
+            circle.velocity.1 -= resistance * angle.sin();
 
             // Change circle sizes.
             circle.radius *= SIZE_COEFFICIENT_PER_TICK;
