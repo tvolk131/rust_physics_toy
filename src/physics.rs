@@ -8,6 +8,8 @@ use std::collections::HashMap;
 
 const ELASTICITY_COEFFICIENT: f32 = 0.7;
 const AIR_RESISTANCE_COEFFICIENT: f32 = 0.998;
+const SIZE_COEFFICIENT_PER_TICK: f32 = 0.998;
+const MIN_RADIUS_SIZE: f32 = 0.5;
 const GRAVITY: f32 = 0.2;
 const CELL_SIZE: f32 = 50.0;
 
@@ -37,6 +39,19 @@ impl Grid {
     }
 
     pub fn tick(&mut self, sub_ticks: u32) {
+        // Apply subtick-independent forces first.
+        for circle in &mut self.circles {
+            // Apply air resistance to all circles.
+            circle.velocity.0 *= AIR_RESISTANCE_COEFFICIENT;
+            circle.velocity.1 *= AIR_RESISTANCE_COEFFICIENT;
+
+            // Change circle sizes.
+            circle.radius *= SIZE_COEFFICIENT_PER_TICK;
+        }
+
+        self.circles
+            .retain(|circle| circle.radius >= MIN_RADIUS_SIZE);
+
         for _ in 0..sub_ticks {
             // Apply gravity to all circles.
             for cell in &mut self.circles {
@@ -101,12 +116,6 @@ impl Grid {
                     }
                 }
             }
-        }
-
-        // Apply air resistance to all circles.
-        for cell in &mut self.circles {
-            cell.velocity.0 *= AIR_RESISTANCE_COEFFICIENT;
-            cell.velocity.1 *= AIR_RESISTANCE_COEFFICIENT;
         }
     }
 
