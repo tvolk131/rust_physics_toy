@@ -3,7 +3,7 @@ use iced::{
     window::{settings::PlatformSpecific, Settings},
     Element, Length, Size, Subscription, Task, Theme,
 };
-use physics::{Circle, GridFrame, GridMessage};
+use physics::{Circle, GridFrame, GridMessage, StaticCircle, StaticRectangle};
 
 mod physics;
 
@@ -109,8 +109,13 @@ impl App {
             // outer `stream!` is created on every update, but will only be polled if the subscription
             // ID is new.
             async_stream::stream! {
-                let (grid_message_sender, grid_frame_stream) =
+                let (mut grid_message_sender, grid_frame_stream) =
                     physics::new_throttled_grid_frame_stream(APP_WIDTH, APP_HEIGHT, TARGET_FPS);
+
+                let square_size = 200.0;
+                for message in create_rounded_rectangle(APP_WIDTH / 2.0 - square_size / 2.0, APP_HEIGHT / 2.0 - square_size / 2.0, square_size, square_size, 20.0) {
+                    grid_message_sender.try_send(message).unwrap();
+                }
 
                 yield Message::SetGridMessageSender(grid_message_sender);
 
@@ -122,4 +127,60 @@ impl App {
             },
         )
     }
+}
+
+fn create_rounded_rectangle(
+    x_pos: f32,
+    y_pos: f32,
+    width: f32,
+    height: f32,
+    border_radius: f32,
+) -> Vec<GridMessage> {
+    let mut messages = Vec::new();
+
+    // Horizontal rectangle in the middle
+    messages.push(GridMessage::AddStaticRectangle(StaticRectangle {
+        x_pos: x_pos + border_radius,
+        y_pos,
+        width: width - 2.0 * border_radius,
+        height,
+    }));
+
+    // Vertical rectangle in the middle
+    messages.push(GridMessage::AddStaticRectangle(StaticRectangle {
+        x_pos,
+        y_pos: y_pos + border_radius,
+        width,
+        height: height - 2.0 * border_radius,
+    }));
+
+    // Top-left corner
+    messages.push(GridMessage::AddStaticCircle(StaticCircle {
+        x_pos: x_pos + border_radius,
+        y_pos: y_pos + border_radius,
+        radius: border_radius,
+    }));
+
+    // Top-right corner
+    messages.push(GridMessage::AddStaticCircle(StaticCircle {
+        x_pos: x_pos + width - border_radius,
+        y_pos: y_pos + border_radius,
+        radius: border_radius,
+    }));
+
+    // Bottom-left corner
+    messages.push(GridMessage::AddStaticCircle(StaticCircle {
+        x_pos: x_pos + border_radius,
+        y_pos: y_pos + height - border_radius,
+        radius: border_radius,
+    }));
+
+    // Bottom-right corner
+    messages.push(GridMessage::AddStaticCircle(StaticCircle {
+        x_pos: x_pos + width - border_radius,
+        y_pos: y_pos + height - border_radius,
+        radius: border_radius,
+    }));
+
+    messages
 }

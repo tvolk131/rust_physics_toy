@@ -16,6 +16,8 @@ const MIN_RADIUS_SIZE: f32 = 0.5;
 const GRAVITY: f32 = 0.2;
 const CELL_SIZE: f32 = 50.0;
 const BALL_COLOR: Color = Color::from_rgb(1.0, 0.6, 0.0);
+const STATIC_CIRCLE_COLOR: Color = Color::from_rgb(0.2, 0.2, 0.2);
+const STATIC_RECTANGLE_COLOR: Color = Color::from_rgb(0.2, 0.2, 0.2);
 
 use crate::Message;
 
@@ -60,6 +62,8 @@ pub fn new_throttled_grid_frame_stream(
 
 pub enum GridMessage {
     AddCircle(Circle),
+    AddStaticCircle(StaticCircle),
+    AddStaticRectangle(StaticRectangle),
 }
 
 #[derive(Debug, Clone)]
@@ -68,6 +72,8 @@ pub struct GridFrame {
     width: f32,
     height: f32,
     circles: Vec<Circle>,
+    static_circles: Vec<StaticCircle>,
+    static_rectangles: Vec<StaticRectangle>,
 }
 
 impl GridFrame {
@@ -85,6 +91,8 @@ struct Grid {
     width: f32,
     height: f32,
     circles: Vec<Circle>,
+    static_circles: Vec<StaticCircle>,
+    static_rectangles: Vec<StaticRectangle>,
     message_receiver: mpsc::Receiver<GridMessage>,
 }
 
@@ -98,6 +106,8 @@ impl Grid {
                 width,
                 height,
                 circles: Vec::new(),
+                static_circles: Vec::new(),
+                static_rectangles: Vec::new(),
                 message_receiver,
             },
             message_sender,
@@ -108,6 +118,12 @@ impl Grid {
         for message in messages {
             match message {
                 GridMessage::AddCircle(circle) => self.circles.push(circle),
+                GridMessage::AddStaticCircle(static_circle) => {
+                    self.static_circles.push(static_circle)
+                }
+                GridMessage::AddStaticRectangle(static_rectangle) => {
+                    self.static_rectangles.push(static_rectangle)
+                }
             }
         }
 
@@ -191,6 +207,20 @@ impl Grid {
                     }
                 }
             }
+
+            // Handle collisions between dynamic circles and static circles
+            for circle in &mut self.circles {
+                for static_circle in &self.static_circles {
+                    Self::circle_static_circle_collision(circle, static_circle);
+                }
+            }
+
+            // Handle collisions between dynamic circles and static rectangles
+            for circle in &mut self.circles {
+                for static_rectangle in &self.static_rectangles {
+                    Self::circle_static_rectangle_collision(circle, static_rectangle);
+                }
+            }
         }
 
         self.frame_number += 1;
@@ -200,6 +230,8 @@ impl Grid {
             width: self.width,
             height: self.height,
             circles: self.circles.clone(),
+            static_circles: self.static_circles.clone(),
+            static_rectangles: self.static_rectangles.clone(),
         }
     }
 
@@ -273,6 +305,65 @@ impl Grid {
         circle_b.x_pos += overlap * nx;
         circle_b.y_pos += overlap * ny;
     }
+
+    fn circle_static_circle_collision(circle: &mut Circle, static_circle: &StaticCircle) {
+        let dx = circle.x_pos - static_circle.x_pos;
+        let dy = circle.y_pos - static_circle.y_pos;
+        let distance = (dx * dx + dy * dy).sqrt();
+        let min_distance = circle.radius + static_circle.radius;
+
+        if distance < min_distance {
+            let nx = dx / distance;
+            let ny = dy / distance;
+
+            // Project circle out of collision
+            let overlap = min_distance - distance;
+            circle.x_pos += overlap * nx;
+            circle.y_pos += overlap * ny;
+
+            // Reflect velocity
+            let v_dot_n = circle.velocity.0 * nx + circle.velocity.1 * ny;
+            circle.velocity.0 -= 2.0 * v_dot_n * nx * ELASTICITY_COEFFICIENT;
+            circle.velocity.1 -= 2.0 * v_dot_n * ny * ELASTICITY_COEFFICIENT;
+        }
+    }
+
+    fn circle_static_rectangle_collision(circle: &mut Circle, rect: &StaticRectangle) {
+        // Find the closest point to the circle within the rectangle
+        let closest_x = clamp(circle.x_pos, rect.x_pos, rect.x_pos + rect.width);
+        let closest_y = clamp(circle.y_pos, rect.y_pos, rect.y_pos + rect.height);
+
+        let dx = circle.x_pos - closest_x;
+        let dy = circle.y_pos - closest_y;
+
+        let distance_squared = dx * dx + dy * dy;
+
+        if distance_squared < circle.radius * circle.radius {
+            let distance = distance_squared.sqrt();
+
+            // Avoid division by zero
+            let (nx, ny) = if distance > 1e-8 {
+                (dx / distance, dy / distance)
+            } else {
+                // Circle center is inside rectangle; choose an arbitrary normal
+                if dx.abs() > dy.abs() {
+                    (dx.signum(), 0.0)
+                } else {
+                    (0.0, dy.signum())
+                }
+            };
+
+            // Project circle out of collision
+            let overlap = circle.radius - distance;
+            circle.x_pos += overlap * nx;
+            circle.y_pos += overlap * ny;
+
+            // Reflect velocity
+            let v_dot_n = circle.velocity.0 * nx + circle.velocity.1 * ny;
+            circle.velocity.0 -= 2.0 * v_dot_n * nx * ELASTICITY_COEFFICIENT;
+            circle.velocity.1 -= 2.0 * v_dot_n * ny * ELASTICITY_COEFFICIENT;
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -281,6 +372,21 @@ pub struct Circle {
     pub y_pos: f32,
     pub radius: f32,
     pub velocity: (f32, f32),
+}
+
+#[derive(Debug, Clone)]
+pub struct StaticCircle {
+    pub x_pos: f32,
+    pub y_pos: f32,
+    pub radius: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct StaticRectangle {
+    pub x_pos: f32,
+    pub y_pos: f32,
+    pub width: f32,
+    pub height: f32,
 }
 
 impl Program<Message> for GridFrame {
@@ -296,6 +402,29 @@ impl Program<Message> for GridFrame {
     ) -> Vec<Geometry> {
         let mut frame = Frame::new(renderer, Size::new(self.width, self.height));
 
+        // Draw static rectangles
+        for static_rectangle in &self.static_rectangles {
+            frame.fill(
+                &Path::rectangle(
+                    Point::new(static_rectangle.x_pos, static_rectangle.y_pos),
+                    Size::new(static_rectangle.width, static_rectangle.height),
+                ),
+                STATIC_RECTANGLE_COLOR,
+            );
+        }
+
+        // Draw static circles
+        for static_circle in &self.static_circles {
+            frame.fill(
+                &Path::circle(
+                    Point::new(static_circle.x_pos, static_circle.y_pos),
+                    static_circle.radius,
+                ),
+                STATIC_CIRCLE_COLOR,
+            );
+        }
+
+        // Draw dynamic circles
         for circle in &self.circles {
             frame.fill(
                 &Path::circle(Point::new(circle.x_pos, circle.y_pos), circle.radius),
@@ -304,5 +433,15 @@ impl Program<Message> for GridFrame {
         }
 
         vec![frame.into_geometry()]
+    }
+}
+
+fn clamp(value: f32, min: f32, max: f32) -> f32 {
+    if value < min {
+        min
+    } else if value > max {
+        max
+    } else {
+        value
     }
 }
