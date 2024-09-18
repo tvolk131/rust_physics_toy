@@ -171,9 +171,9 @@ impl Grid {
         let v_bn = nx * circle_b.velocity.0 + ny * circle_b.velocity.1;
         let v_bt = tx * circle_b.velocity.0 + ty * circle_b.velocity.1;
 
-        // Masses (you might want to define mass based on area or keep it uniform)
-        let m1 = 1.0;
-        let m2 = 1.0;
+        // Masses, based on the circle areas
+        let m1 = circle_a.radius * circle_a.radius;
+        let m2 = circle_b.radius * circle_b.radius;
 
         // Compute new normal velocities using 1D elastic collision equations
         let v_an_new = (v_an * (m1 - m2) + 2.0 * m2 * v_bn) / (m1 + m2);
