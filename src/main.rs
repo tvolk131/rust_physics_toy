@@ -1,15 +1,13 @@
-use std::time::Duration;
-
+use futures::{channel::mpsc, StreamExt};
 use iced::{
     window::{settings::PlatformSpecific, Settings},
-    Element, Size, Subscription, Task, Theme,
+    Element, Length, Size, Subscription, Task, Theme,
 };
-use physics::Circle;
+use physics::{Circle, GridFrame, GridMessage};
 
 mod physics;
 
-const TICK_FPS: u64 = 120;
-const TICK_SPEED: Duration = Duration::from_millis(1000 / TICK_FPS);
+const TARGET_FPS: u64 = 120;
 
 const APP_WIDTH: f32 = 1024.0;
 const APP_HEIGHT: f32 = 768.0;
@@ -47,45 +45,48 @@ fn main() -> iced::Result {
 #[derive(Debug, Clone)]
 pub enum Message {
     // Perform one tick/step of the physics simulation.
-    Tick,
+    SetGridFrame(physics::GridFrame),
+    SetGridMessageSender(mpsc::Sender<physics::GridMessage>),
     AddCircle(Circle),
 }
 
+#[derive(Default)]
 struct App {
-    is_running: bool,
-    grid: physics::Grid,
-}
-
-impl Default for App {
-    fn default() -> Self {
-        Self {
-            is_running: true,
-            grid: physics::Grid::new(APP_WIDTH, APP_HEIGHT),
-        }
-    }
+    grid_message_sender: Option<mpsc::Sender<physics::GridMessage>>,
+    current_grid_frame: Option<physics::GridFrame>,
 }
 
 impl App {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Tick => {
-                let now = std::time::Instant::now();
+            Message::SetGridFrame(grid_frame) => {
+                let frame_number = grid_frame.get_frame_number();
 
-                self.grid.tick(10);
+                self.current_grid_frame = Some(grid_frame);
 
-                let circle_count = self.grid.get_circle_count();
-                if circle_count > 0 {
-                    println!(
-                        "Tick took: {:?} ({:?} per circle)",
-                        now.elapsed(),
-                        now.elapsed() / circle_count as u32
-                    );
-                } else {
-                    println!("Tick took: {:?}", now.elapsed());
+                if frame_number % 20 == 0 {
+                    return Task::done(Message::AddCircle(Circle {
+                        x_pos: 25.0,
+                        y_pos: 25.0,
+                        radius: 25.0,
+                        velocity: (10.0, 0.0),
+                    }));
                 }
             }
+            Message::SetGridMessageSender(grid_message_sender) => {
+                self.grid_message_sender = Some(grid_message_sender);
+            }
             Message::AddCircle(circle) => {
-                self.grid.add_circle(circle);
+                if let Some(grid_message_sender) = self.grid_message_sender.as_mut() {
+                    if grid_message_sender
+                        .try_send(GridMessage::AddCircle(circle))
+                        .is_err()
+                    {
+                        println!("Failed to send AddCircle message to grid_message_sender.");
+                    }
+                } else {
+                    println!("No grid_message_sender to send AddCircle message to.")
+                }
             }
         }
 
@@ -93,24 +94,32 @@ impl App {
     }
 
     fn view(&self) -> Element<Message> {
-        self.grid.view()
+        if let Some(current_grid_frame) = &self.current_grid_frame {
+            current_grid_frame.view()
+        } else {
+            iced::widget::Space::new(Length::Fill, Length::Fill).into()
+        }
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        let mut subscriptions = Vec::new();
+        iced::Subscription::run_with_id(
+            std::any::TypeId::of::<GridFrame>(),
+            // We're wrapping `stream` in a `stream!` macro to make it lazy (meaning `stream` isn't
+            // created unless the outer `stream!` is actually used). This is necessary because the
+            // outer `stream!` is created on every update, but will only be polled if the subscription
+            // ID is new.
+            async_stream::stream! {
+                let (grid_message_sender, grid_frame_stream) =
+                    physics::new_throttled_grid_frame_stream(APP_WIDTH, APP_HEIGHT, TARGET_FPS);
 
-        if self.is_running {
-            subscriptions.push(iced::time::every(TICK_SPEED).map(|_| Message::Tick));
-            subscriptions.push(iced::time::every(Duration::from_millis(200)).map(|_| {
-                Message::AddCircle(Circle {
-                    x_pos: 25.0,
-                    y_pos: 25.0,
-                    radius: 25.0,
-                    velocity: (10.0, 0.0),
-                })
-            }));
-        }
+                yield Message::SetGridMessageSender(grid_message_sender);
 
-        Subscription::batch(subscriptions)
+                let mut grid_frame_stream = Box::pin(grid_frame_stream);
+
+                while let Some(msg) = grid_frame_stream.next().await {
+                    yield Message::SetGridFrame(msg);
+                }
+            },
+        )
     }
 }

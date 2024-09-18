@@ -4,9 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+async-stream = "0.3.5"
+futures = "0.3.30"
 iced = { git = "https://github.com/iced-rs/iced", rev = "8fb939b", features = [
     "advanced",
     "qr_code",
     "svg",
     "tokio",
 ] }
+tokio = "1.40.0"
