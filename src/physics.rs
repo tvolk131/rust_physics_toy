@@ -58,36 +58,36 @@ impl Grid {
 
         for _ in 0..sub_ticks {
             // Apply gravity to all circles.
-            for cell in &mut self.circles {
-                cell.velocity.1 += GRAVITY / sub_ticks as f32;
+            for circle in &mut self.circles {
+                circle.velocity.1 += GRAVITY / sub_ticks as f32;
             }
 
             // Move circles based on current velocity.
-            for cell in &mut self.circles {
-                cell.x_pos += cell.velocity.0 / sub_ticks as f32;
-                cell.y_pos += cell.velocity.1 / sub_ticks as f32;
+            for circle in &mut self.circles {
+                circle.x_pos += circle.velocity.0 / sub_ticks as f32;
+                circle.y_pos += circle.velocity.1 / sub_ticks as f32;
             }
 
             // Bounce circles off the walls, applying friction.
-            for cell in &mut self.circles {
-                if cell.x_pos - cell.radius < 0.0 {
-                    cell.x_pos = cell.radius;
-                    cell.velocity.0 = -cell.velocity.0 * ELASTICITY_COEFFICIENT;
+            for circle in &mut self.circles {
+                if circle.x_pos - circle.radius < 0.0 {
+                    circle.x_pos = circle.radius;
+                    circle.velocity.0 = -circle.velocity.0 * ELASTICITY_COEFFICIENT;
                 }
 
-                if cell.x_pos + cell.radius > self.width {
-                    cell.x_pos = self.width - cell.radius;
-                    cell.velocity.0 = -cell.velocity.0 * ELASTICITY_COEFFICIENT;
+                if circle.x_pos + circle.radius > self.width {
+                    circle.x_pos = self.width - circle.radius;
+                    circle.velocity.0 = -circle.velocity.0 * ELASTICITY_COEFFICIENT;
                 }
 
-                if cell.y_pos - cell.radius < 0.0 {
-                    cell.y_pos = cell.radius;
-                    cell.velocity.1 = -cell.velocity.1 * ELASTICITY_COEFFICIENT;
+                if circle.y_pos - circle.radius < 0.0 {
+                    circle.y_pos = circle.radius;
+                    circle.velocity.1 = -circle.velocity.1 * ELASTICITY_COEFFICIENT;
                 }
 
-                if cell.y_pos + cell.radius > self.height {
-                    cell.y_pos = self.height - cell.radius;
-                    cell.velocity.1 = -cell.velocity.1 * ELASTICITY_COEFFICIENT;
+                if circle.y_pos + circle.radius > self.height {
+                    circle.y_pos = self.height - circle.radius;
+                    circle.velocity.1 = -circle.velocity.1 * ELASTICITY_COEFFICIENT;
                 }
             }
 
@@ -220,9 +220,11 @@ impl Program<Message> for Grid {
     ) -> Vec<Geometry> {
         let mut frame = Frame::new(renderer, Size::new(self.width, self.height));
 
-        for cell in &self.circles {
-            let cell = Path::circle(Point::new(cell.x_pos, cell.y_pos), cell.radius);
-            frame.fill(&cell, BALL_COLOR);
+        for circle in &self.circles {
+            frame.fill(
+                &Path::circle(Point::new(circle.x_pos, circle.y_pos), circle.radius),
+                BALL_COLOR,
+            );
         }
 
         vec![frame.into_geometry()]
