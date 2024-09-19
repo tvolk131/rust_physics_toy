@@ -22,14 +22,8 @@ fn main() -> iced::Result {
                 height: APP_HEIGHT,
             },
             position: iced::window::Position::Default,
-            min_size: Some(Size {
-                width: APP_WIDTH,
-                height: APP_HEIGHT,
-            }),
-            max_size: Some(Size {
-                width: APP_WIDTH,
-                height: APP_HEIGHT,
-            }),
+            min_size: None,
+            max_size: None,
             visible: true,
             resizable: true,
             decorations: true,
@@ -48,6 +42,7 @@ pub enum Message {
     SetGridFrame(physics::GridFrame),
     SetGridMessageSender(mpsc::Sender<physics::GridMessage>),
     AddCircle(Circle),
+    ResizeWindow(Size),
 }
 
 #[derive(Default)]
@@ -88,6 +83,16 @@ impl App {
                     println!("No grid_message_sender to send AddCircle message to.")
                 }
             }
+            Message::ResizeWindow(size) => {
+                if let Some(grid_message_sender) = self.grid_message_sender.as_mut() {
+                    if grid_message_sender
+                        .try_send(GridMessage::Resize(size))
+                        .is_err()
+                    {
+                        println!("Failed to resize grid window.");
+                    }
+                }
+            }
         }
 
         Task::none()
@@ -102,7 +107,9 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        iced::Subscription::run_with_id(
+        let mut subscriptions = Vec::new();
+
+        subscriptions.push(iced::Subscription::run_with_id(
             std::any::TypeId::of::<GridFrame>(),
             // We're wrapping `stream` in a `stream!` macro to make it lazy (meaning `stream` isn't
             // created unless the outer `stream!` is actually used). This is necessary because the
@@ -125,7 +132,12 @@ impl App {
                     yield Message::SetGridFrame(msg);
                 }
             },
-        )
+        ));
+
+        subscriptions
+            .push(iced::window::resize_events().map(|(_, size)| Message::ResizeWindow(size)));
+
+        iced::Subscription::batch(subscriptions)
     }
 }
 

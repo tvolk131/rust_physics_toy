@@ -64,6 +64,7 @@ pub enum GridMessage {
     AddCircle(Circle),
     AddStaticCircle(StaticCircle),
     AddStaticRectangle(StaticRectangle),
+    Resize(Size),
 }
 
 #[derive(Debug, Clone)]
@@ -123,6 +124,10 @@ impl Grid {
                 }
                 GridMessage::AddStaticRectangle(static_rectangle) => {
                     self.static_rectangles.push(static_rectangle)
+                }
+                GridMessage::Resize(size) => {
+                    self.width = size.width;
+                    self.height = size.height;
                 }
             }
         }
