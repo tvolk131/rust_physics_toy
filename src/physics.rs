@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 const SUBTICKS_PER_FRAME: u32 = 10;
-const ELASTICITY_COEFFICIENT: f32 = 0.7;
-const AIR_DENSITY: f32 = 0.005;
+const ELASTICITY_COEFFICIENT: f32 = 0.9;
+const AIR_DENSITY: f32 = 0.007;
 const SIZE_COEFFICIENT_PER_TICK: f32 = 0.998;
 const MIN_RADIUS_SIZE: f32 = 0.5;
 const GRAVITY: f32 = 0.2;

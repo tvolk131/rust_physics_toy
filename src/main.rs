@@ -9,8 +9,8 @@ mod physics;
 
 const TARGET_FPS: u64 = 120;
 
-const APP_WIDTH: f32 = 1024.0;
-const APP_HEIGHT: f32 = 768.0;
+const APP_WIDTH: f32 = 800.0;
+const APP_HEIGHT: f32 = 480.0;
 
 fn main() -> iced::Result {
     iced::application("Physics", App::update, App::view)
@@ -59,11 +59,11 @@ impl App {
 
                 self.current_grid_frame = Some(grid_frame);
 
-                if frame_number % 20 == 0 {
+                if frame_number % 10 == 0 {
                     return Task::done(Message::AddCircle(Circle {
-                        x_pos: 25.0,
-                        y_pos: 25.0,
-                        radius: 25.0,
+                        x_pos: 10.0,
+                        y_pos: 10.0,
+                        radius: 10.0,
                         velocity: (10.0, 0.0),
                     }));
                 }
